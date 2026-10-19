@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Telehealth & Emergency Patient Portal</title>
+    <style>
+        :root {
+            --primary: #2b6cb0;
+            --danger: #e53e3e;
+            --success: #38a169;
+            --bg: #f7fafc;
+            --card-bg: #ffffff;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg);
+            margin: 0;
+            padding: 20px;
+            color: #2d3748;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            color: #1a202c;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border-radius: 10px;
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+        }
+
+        .emergency-card {
+            border: 2px solid var(--danger);
+            background-color: #fff5f5;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 14px;
+            font-size: 16px;
+            font-weight: bold;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+
+        .btn-danger {
+            background-color: var(--danger);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background-color: #c53030;
+        }
+
+        .btn-primary {
+            background-color: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: #2c5282;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+            text-align: left;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #cbd5e0;
+            border-radius: 5px;
+            box-sizing: border-box;
+            font-size: 14px;
+        }
+
+        .status-msg {
+            margin-top: 12px;
+            font-weight: bold;
+            text-align: center;
+        }
+
+        .alert-success { color: var(--success); }
+        .alert-danger { color: var(--danger); }
+        .alert-info { color: var(--primary); }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🏥 Telehealth Patient Portal</h1>
+
+    <!-- 1. EMERGENCY SOS SECTION -->
+    <div class="card emergency-card">
+        <h2>🚨 Emergency Medical Trigger</h2>
+        <p>If you are experiencing severe distress or a life-threatening emergency, trigger an immediate SOS with your GPS coordinates.</p>
+        <button id="sosBtn" class="btn btn-danger" onclick="triggerEmergencySOS()">🚨 TRIGGER EMERGENCY SOS</button>
+        <div id="sosStatus" class="status-msg"></div>
+    </div>
+
+    <!-- 2. CLINICAL CONSULTATION & TRIAGE SECTION -->
+    <div class="card">
+        <h2>🩺 Book Clinical Consultation</h2>
+        <div class="form-group">
+            <label for="patientId">Patient ID:</label>
+            <input type="text" id="patientId" value="patient_101" placeholder="Enter Patient ID">
+        </div>
+
+        <div class="form-group">
+            <label for="specialty">Medical Specialty:</label>
+            <select id="specialty">
+                <option value="General Practitioner">General Practitioner</option>
+                <option value="Cardiologist">Cardiologist</option>
+                <option value="Pulmonologist">Pulmonologist</option>
+                <option value="Pediatrician">Pediatrician</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="symptoms">Describe Symptoms:</label>
+            <textarea id="symptoms" rows="3" placeholder="e.g., Severe difficulty in breathing, chest pain, or routine checkup"></textarea>
+        </div>
+
+        <button class="btn btn-primary" onclick="bookAppointment()">Book & Hold Escrow Payment</button>
+        <div id="bookingStatus" class="status-msg"></div>
+    </div>
+
+    <!-- 3. PHARMACY LOCATOR SECTION -->
+    <div class="card">
+        <h2>💊 Find Nearby Pharmacies</h2>
+        <p>Search for certified medication centers within your proximity.</p>
+        <div class="form-group">
+            <label for="radius">Search Radius (km):</label>
+            <input type="number" id="radius" value="10" min="1" max="50">
+        </div>
+        <button class="btn btn-primary" onclick="findPharmacies()">Search Pharmacies</button>
+        <div id="pharmacyStatus" class="status-msg"></div>
+        <ul id="pharmacyList" style="text-align: left; margin-top: 15px;"></ul>
+    </div>
+</div>
+
+<script>
+    // Live Python Backend URL running locally
+    const BACKEND_URL = 'http://127.0.0.1:8000';
+
+    // --- 1. EMERGENCY SOS & GEOLOCATOR TRIGGER ---
+    function triggerEmergencySOS() {
+        const statusText = document.getElementById("sosStatus");
+        const sosBtn = document.getElementById("sosBtn");
+        
+        statusText.className = "status-msg alert-info";
+        statusText.innerText = "📍 Fetching GPS coordinates from browser...";
+        sosBtn.disabled = true;
+
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const lat = position.coords.latitude;
+                    const lon = position.coords.longitude;
+                    statusText.innerText = "Coordinates captured! Sending alert to backend...";
+                    sendEmergencyData(lat, lon);
+                },
+                (error) => {
+                    statusText.className = "status-msg alert-danger";
+                    statusText.innerText = "⚠️ Location permission denied. Dispatching alert without GPS coordinates...";
+                    sendEmergencyData(null, null);
+                }
+            );
+        } else {
+            statusText.className = "status-msg alert-danger";
+            statusText.innerText = "⚠️ Geolocation not supported by this browser.";
+            sendEmergencyData(null, null);
+        }
+    }
+
+    async function sendEmergencyData(lat, lon) {
+        const statusText = document.getElementById("sosStatus");
+        const sosBtn = document.getElementById("sosBtn");
+
+        try {
+            const response = await fetch(`${BACKEND_URL}/api/emergency`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user_id: document.getElementById("patientId").value || "patient_101",
+                    latitude: lat,
+                    longitude: lon
+                })
+            });
+
+            const data = await response.json();
+            if (response.ok) {
+                statusText.className = "status-msg alert-danger";
+                statusText.innerHTML = `🚨 <strong>EMERGENCY LOGGED!</strong> ${data.message}`;
+            } else {
+                throw new Error("Backend response error");
+            }
+        } catch (err) {
+            statusText.className = "status-msg alert-danger";
+            statusText.innerText = "⚠️ Failed to reach Python Backend. Is uvicorn running?";
+        } finally {
+            sosBtn.disabled = false;
+        }
+    }
+
+    // --- 2. TRIAGE & APPOINTMENT BOOKING WITH ESCROW ---
+    async function bookAppointment() {
+        const patientId = document.getElementById("patientId").value;
+        const specialty = document.getElementById("specialty").value;
+        const symptoms = document.getElementById("symptoms").value;
+        const statusText = document.getElementById("bookingStatus");
+
+        if (!symptoms.trim()) {
+            statusText.className = "status-msg alert-danger";
+            statusText.innerText = "⚠️ Please describe your symptoms before booking.";
+            return;
+        }
+
+        statusText.className = "status-msg alert-info";
+        statusText.innerText = "Processing triage & locking payment in escrow...";
+
+        try {
+            // Step A: Book Appointment & Perform Triage
+            const response = await fetch(`${BACKEND_URL}/api/book-appointment`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user_id: patientId,
+                    specialty: specialty,
+                    symptoms: symptoms
+                })
+            });
+
+            const data = await response.json();
+
+            // Step B: Lock Escrow Payment
+            await fetch(`${BACKEND_URL}/api/escrow-payment`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    consultation_id: `CONS_${Date.now()}`,
+                    amount: 50.00,
+                    status: "Locked in Escrow"
+                })
+            });
+
+            if (response.ok) {
+                statusText.className = "status-msg alert-success";
+                statusText.innerHTML = `✅ <strong>Booking Confirmed!</strong><br>Priority Level: <strong>${data.priority}</strong><br>Escrow Payment: <strong>$50.00 Locked</strong>`;
+            }
+        } catch (err) {
+            statusText.className = "status-msg alert-danger";
+            statusText.innerText = "⚠️ Unable to complete booking request. Check backend status.";
+        }
+    }
+
+    // --- 3. PHARMACY LOCATOR ---
+    function findPharmacies() {
+        const statusText = document.getElementById("pharmacyStatus");
+        const listContainer = document.getElementById("pharmacyList");
+        const radius = parseFloat(document.getElementById("radius").value);
+
+        listContainer.innerHTML = "";
+        statusText
